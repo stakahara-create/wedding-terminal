@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ウェディングターミナル</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<style>
+:root{
+  --ink:#2A2622;
+  --ink-soft:#6B6357;
+  --bg:#FAF6EE;
+  --surface:#FFFFFF;
+  --surface-soft:#F2ECDC;
+  --navy:#2C3A52;
+  --navy-light:#425374;
+  --gold:#B8912F;
+  --gold-soft:#E8D9A0;
+  --plum:#8B4C5C;
+  --plum-bg:#F3E4E5;
+  --sage:#5E7D5E;
+  --sage-bg:#E6EEE1;
+  --border:#E3DCC8;
+  --radius:10px;
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:'Noto Sans JP',sans-serif;}
+.wt-app{display:flex;min-height:640px;max-width:1180px;margin:0 auto;border:1px solid var(--border);background:var(--surface);}
+.wt-side{width:200px;flex-shrink:0;background:var(--navy);color:#EFE9D8;padding:28px 0;}
+.wt-brand{font-family:'Shippori Mincho',serif;font-size:20px;font-weight:700;padding:0 24px 22px;border-bottom:1px solid rgba(239,233,216,0.18);margin-bottom:18px;letter-spacing:0.04em;}
+.wt-brand small{display:block;font-family:'Noto Sans JP',sans-serif;font-weight:400;font-size:11px;color:var(--gold-soft);margin-top:4px;letter-spacing:0.12em;}
+.wt-nav-item{display:flex;align-items:center;gap:10px;padding:12px 24px;cursor:pointer;font-size:14px;color:#D9D2BC;border-left:3px solid transparent;transition:background .15s;}
+.wt-nav-item:hover{background:rgba(255,255,255,0.05);}
+.wt-nav-item.active{background:rgba(255,255,255,0.08);border-left-color:var(--gold);color:#FFFDF6;font-weight:500;}
+.wt-nav-dot{width:6px;height:6px;border-radius:50%;background:var(--gold-soft);opacity:.7;}
+.wt-main{flex:1;padding:30px 36px;min-width:0;}
+.wt-header{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:22px;border-bottom:1px dashed var(--border);padding-bottom:16px;}
+.wt-title{font-family:'Shippori Mincho',serif;font-size:22px;font-weight:700;color:var(--navy);margin:0;}
+.wt-sub{font-size:12px;color:var(--ink-soft);margin-top:4px;}
+.wt-section{display:none;}
+.wt-section.active{display:block;}
+.wt-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:24px;}
+.wt-card{background:var(--surface-soft);border-radius:var(--radius);padding:14px 16px;border:1px solid var(--border);}
+.wt-card .l{font-size:11px;color:var(--ink-soft);letter-spacing:.04em;margin-bottom:6px;}
+.wt-card .v{font-family:'Shippori Mincho',serif;font-size:22px;font-weight:700;color:var(--navy);}
+.wt-card .v.plum{color:var(--plum);}
+.wt-card .v.sage{color:var(--sage);}
+.wt-panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;margin-bottom:18px;}
+.wt-panel h3{font-family:'Shippori Mincho',serif;font-size:15px;margin:0 0 12px;color:var(--navy);display:flex;align-items:center;gap:8px;}
+.wt-panel h3::before{content:'';width:10px;height:10px;background:var(--gold);display:inline-block;transform:rotate(45deg);}
+table.wt-table{width:100%;border-collapse:collapse;font-size:13px;}
+table.wt-table th{text-align:left;padding:8px 8px;border-bottom:2px solid var(--navy);color:var(--navy);font-weight:500;font-size:12px;white-space:nowrap;}
+table.wt-table td{padding:7px 8px;border-bottom:1px solid var(--border);vertical-align:middle;}
+table.wt-table tr:hover td{background:var(--surface-soft);}
+.wt-badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:500;}
+.wt-badge.att-出席{background:var(--sage-bg);color:var(--sage);}
+.wt-badge.att-欠席{background:var(--plum-bg);color:var(--plum);}
+.wt-badge.att-未定{background:var(--gold-soft);color:#7A5F14;}
+input,select,textarea{font-family:'Noto Sans JP',sans-serif;font-size:13px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:#fff;color:var(--ink);}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--navy-light);}
+button{font-family:'Noto Sans JP',sans-serif;cursor:pointer;border-radius:6px;border:1px solid var(--navy);background:var(--navy);color:#fff;padding:7px 14px;font-size:13px;font-weight:500;}
+button:hover{background:var(--navy-light);}
+button.ghost{background:transparent;color:var(--navy);border:1px solid var(--border);}
+button.ghost:hover{background:var(--surface-soft);}
+button.danger{background:transparent;color:var(--plum);border:1px solid var(--plum-bg);padding:4px 8px;font-size:12px;}
+button.danger:hover{background:var(--plum-bg);}
+.wt-form-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;}
+.wt-form-row input,.wt-form-row select{flex:1;min-width:90px;}
+.wt-phase{margin-bottom:18px;}
+.wt-phase-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+.wt-phase-head .name{font-weight:500;color:var(--navy);font-size:13px;}
+.wt-phase-bar{height:5px;background:var(--surface-soft);border-radius:3px;overflow:hidden;width:120px;}
+.wt-phase-bar .fill{height:100%;background:var(--gold);}
+.wt-task-row{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px;}
+.wt-task-row.done .title{text-decoration:line-through;color:var(--ink-soft);}
+.wt-task-row .title{flex:1;}
+.wt-task-row .due{font-size:11px;color:var(--ink-soft);}
+.wt-empty{color:var(--ink-soft);font-size:13px;padding:14px 0;text-align:center;}
+.wt-small{font-size:11px;color:var(--ink-soft);}
+.wt-savebar{font-size:11px;color:var(--ink-soft);text-align:right;margin-top:4px;min-height:14px;}
+.wt-net-panel{display:flex;gap:20px;align-items:center;background:var(--navy);color:#fff;border-radius:var(--radius);padding:16px 20px;margin-bottom:18px;}
+.wt-net-panel .item{flex:1;text-align:center;}
+.wt-net-panel .item .l{font-size:11px;color:var(--gold-soft);margin-bottom:4px;}
+.wt-net-panel .item .v{font-family:'Shippori Mincho',serif;font-size:20px;font-weight:700;}
+.wt-net-panel .sep{width:1px;height:32px;background:rgba(255,255,255,0.2);}
+</style>
+</head>
+<body>
+<div class="wt-app">
+  <div class="wt-side">
+    <div class="wt-brand">結婚式準備<small>WEDDING TERMINAL・リアルタイム同期</small></div>
+    <div class="wt-nav-item active" data-tab="dashboard"><span class="wt-nav-dot"></span>ダッシュボード</div>
+    <div class="wt-nav-item" data-tab="guests"><span class="wt-nav-dot"></span>出席者管理</div>
+    <div class="wt-nav-item" data-tab="schedule"><span class="wt-nav-dot"></span>スケジュール</div>
+    <div class="wt-nav-item" data-tab="budget"><span class="wt-nav-dot"></span>予算管理</div>
+  </div>
+  <div class="wt-main">
+
+    <div id="sec-dashboard" class="wt-section active">
+      <div class="wt-header">
+        <div>
+          <p class="wt-title">ダッシュボード</p>
+          <p class="wt-sub">結婚式準備の全体状況</p>
+        </div>
+      </div>
+      <div class="wt-grid" id="dash-cards"></div>
+      <div class="wt-panel">
+        <h3>直近の未完了タスク</h3>
+        <div id="dash-tasks"></div>
+      </div>
+    </div>
+
+    <div id="sec-guests" class="wt-section">
+      <div class="wt-header">
+        <div>
+          <p class="wt-title">出席者管理</p>
+          <p class="wt-sub">芳名帳 — ゲストの出欠・卓・ご祝儀を一元管理</p>
+        </div>
+      </div>
+      <div class="wt-panel">
+        <h3>ゲストを追加</h3>
+        <div class="wt-form-row">
+          <input id="g-name" placeholder="氏名">
+          <select id="g-group"><option>親族</option><option>友人</option><option>職場</option><option>その他</option></select>
+          <select id="g-side"><option>新郎側</option><option>新婦側</option></select>
+          <select id="g-rsvp"><option>未定</option><option>出席</option><option>欠席</option></select>
+          <input id="g-table" type="number" placeholder="卓番号" style="max-width:80px;">
+          <input id="g-gift" type="number" placeholder="ご祝儀予想(円)" style="max-width:130px;">
+          <input id="g-notes" placeholder="アレルギー・備考" style="min-width:140px;">
+          <button id="g-add">追加</button>
+        </div>
+      </div>
+      <div class="wt-panel">
+        <h3>ゲスト一覧 <span class="wt-small" id="g-count"></span></h3>
+        <table class="wt-table">
+          <thead><tr><th>氏名</th><th>属性</th><th>側</th><th>出欠</th><th>卓</th><th>ご祝儀予想</th><th>備考</th><th></th></tr></thead>
+          <tbody id="g-body"></tbody>
+        </table>
+        <div id="g-empty" class="wt-empty" style="display:none;">まだゲストが登録されていません。上のフォームから追加してください。</div>
+      </div>
+    </div>
+
+    <div id="sec-schedule" class="wt-section">
+      <div class="wt-header">
+        <div>
+          <p class="wt-title">スケジュール</p>
+          <p class="wt-sub">フェーズ別タスク管理</p>
+        </div>
+      </div>
+      <div class="wt-panel">
+        <h3>タスクを追加</h3>
+        <div class="wt-form-row">
+          <select id="t-phase"></select>
+          <input id="t-title" placeholder="タスク内容" style="flex:2;">
+          <input id="t-due" type="date">
+          <button id="t-add">追加</button>
+        </div>
+      </div>
+      <div id="phase-list"></div>
+    </div>
+
+    <div id="sec-budget" class="wt-section">
+      <div class="wt-header">
+        <div>
+          <p class="wt-title">予算管理</p>
+          <p class="wt-sub">支出とご祝儀見込みの収支</p>
+        </div>
+      </div>
+      <div class="wt-net-panel" id="net-panel"></div>
+      <div class="wt-panel">
+        <h3>費目を追加</h3>
+        <div class="wt-form-row">
+          <input id="b-cat" placeholder="費目(例: 会場費)">
+          <input id="b-budget" type="number" placeholder="予算額(円)">
+          <input id="b-actual" type="number" placeholder="実費(円・未確定なら空欄)">
+          <input id="b-note" placeholder="メモ">
+          <button id="b-add">追加</button>
+        </div>
+      </div>
+      <div class="wt-panel">
+        <h3>費目一覧</h3>
+        <table class="wt-table">
+          <thead><tr><th>費目</th><th>予算額</th><th>実費</th><th>差額</th><th>メモ</th><th></th></tr></thead>
+          <tbody id="b-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="wt-savebar" id="save-status"></div>
+  </div>
+</div>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyBeSbGiBQyJ9scfGQ-Mkk0bNfif-yFCb3M",
+  authDomain: "wedding-terminal-6d035.firebaseapp.com",
+  databaseURL: "https://wedding-terminal-6d035-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "wedding-terminal-6d035",
+  storageBucket: "wedding-terminal-6d035.firebasestorage.app",
+  messagingSenderId: "532629174887",
+  appId: "1:532629174887:web:9ae314e942c4b2dd6ab2c2"
+};
+firebase.initializeApp(firebaseConfig);
+const dbRef = firebase.database().ref('wedding-terminal-data');
+const DEFAULT_PHASES = ['1年〜半年前','3〜4ヶ月前','1〜2ヶ月前','2週間〜1週間前','前日〜当日'];
+let state = {
+  guests: [],
+  tasks: [],
+  budget: [],
+  meta: { giftAverage: 30000 }
+};
+
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function yen(n){ return '¥' + Math.round(n||0).toLocaleString('ja-JP'); }
+
+function seedIfEmpty(){
+  if(state.tasks.length === 0){
+    const seed = [
+      ['1年〜半年前','会場を決定する'],
+      ['1年〜半年前','日取りを決定する'],
+      ['3〜4ヶ月前','招待状を発送する'],
+      ['3〜4ヶ月前','衣装を決定する'],
+      ['1〜2ヶ月前','席次を確定する'],
+      ['1〜2ヶ月前','引き出物を発注する'],
+      ['1〜2ヶ月前','余興・スピーチを依頼する'],
+      ['2週間〜1週間前','最終打ち合わせを行う'],
+      ['前日〜当日','持ち物を最終確認する']
+    ];
+    state.tasks = seed.map(([phase,title]) => ({ id: uid(), phase, title, done:false, due:'' }));
+  }
+  if(state.budget.length === 0){
+    const cats = ['会場費','衣装','写真・映像','引き出物','装花','お車代・お礼'];
+    state.budget = cats.map(c => ({ id: uid(), category:c, budgeted:0, actual:0, note:'' }));
+  }
+}
+
+let suppressNextSnapshot = false;
+let firstLoad = true;
+
+function initFirebaseSync(){
+  const bar = document.getElementById('save-status');
+  bar.textContent = 'ログイン中…';
+  firebase.auth().signInAnonymously().catch((err) => {
+    bar.textContent = 'ログインに失敗しました: ' + err.message;
+  });
+  firebase.auth().onAuthStateChanged((user) => {
+    if(!user){ return; }
+    bar.textContent = 'Firebaseに接続中…';
+    dbRef.on('value', (snapshot) => {
+      const val = snapshot.val();
+      if(suppressNextSnapshot){
+        suppressNextSnapshot = false;
+      }
+      if(val){
+        state = Object.assign({ guests:[], tasks:[], budget:[], meta:{ giftAverage:30000 } }, val);
+      } else if(firstLoad){
+        seedIfEmpty();
+        pushState();
+      }
+      firstLoad = false;
+      renderAll();
+      bar.textContent = '同期済み ' + new Date().toLocaleTimeString('ja-JP');
+    }, (err) => {
+      bar.textContent = 'Firebase接続エラー: ' + err.message;
+    });
+  });
+}
+
+let saveTimer = null;
+function saveState(){
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(pushState, 250);
+}
+
+function pushState(){
+  const bar = document.getElementById('save-status');
+  bar.textContent = '保存中…';
+  suppressNextSnapshot = true;
+  dbRef.set(state)
+    .then(() => { bar.textContent = '同期済み ' + new Date().toLocaleTimeString('ja-JP'); })
+    .catch((err) => { bar.textContent = '保存に失敗しました: ' + err.message; });
+}
+
+function renderAll(){
+  renderDashboard();
+  renderGuests();
+  renderSchedule();
+  renderBudget();
+}
+
+// ---------- Dashboard ----------
+function renderDashboard(){
+  const total = state.guests.length;
+  const att = state.guests.filter(g=>g.rsvp==='出席').length;
+  const dec = state.guests.filter(g=>g.rsvp==='欠席').length;
+  const pen = state.guests.filter(g=>g.rsvp==='未定').length;
+  const giftTotal = state.guests.filter(g=>g.rsvp==='出席').reduce((s,g)=>s+(Number(g.gift)||0),0);
+  const doneTasks = state.tasks.filter(t=>t.done).length;
+  const totalTasks = state.tasks.length;
+
+  const cards = [
+    ['総ゲスト数', total, ''],
+    ['出席', att, 'sage'],
+    ['欠席', dec, 'plum'],
+    ['未定', pen, ''],
+    ['ご祝儀見込み', yen(giftTotal), 'sage'],
+    ['タスク進捗', doneTasks + ' / ' + totalTasks, '']
+  ];
+  document.getElementById('dash-cards').innerHTML = cards.map(([l,v,cls]) =>
+    `<div class="wt-card"><div class="l">${l}</div><div class="v ${cls}">${v}</div></div>`
+  ).join('');
+
+  const pending = state.tasks.filter(t=>!t.done).slice(0,8);
+  const dashTasks = document.getElementById('dash-tasks');
+  if(pending.length===0){
+    dashTasks.innerHTML = '<div class="wt-empty">未完了のタスクはありません。</div>';
+  }else{
+    dashTasks.innerHTML = pending.map(t =>
+      `<div class="wt-task-row"><span class="title">[${t.phase}] ${escapeHtml(t.title)}</span><span class="due">${t.due||''}</span></div>`
+    ).join('');
+  }
+}
+
+function escapeHtml(s){
+  return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// ---------- Guests ----------
+function renderGuests(){
+  const body = document.getElementById('g-body');
+  const empty = document.getElementById('g-empty');
+  document.getElementById('g-count').textContent = '(' + state.guests.length + '名)';
+  if(state.guests.length===0){
+    body.innerHTML = '';
+    empty.style.display='block';
+    return;
+  }
+  empty.style.display='none';
+  body.innerHTML = state.guests.map(g => `
+    <tr data-id="${g.id}">
+      <td>${escapeHtml(g.name)}</td>
+      <td>${escapeHtml(g.group)}</td>
+      <td>${escapeHtml(g.side)}</td>
+      <td><span class="wt-badge att-${g.rsvp}">${g.rsvp}</span></td>
+      <td>${g.table||'-'}</td>
+      <td>${g.gift ? yen(g.gift) : '-'}</td>
+      <td>${escapeHtml(g.notes)}</td>
+      <td><button class="danger" data-del-guest="${g.id}">削除</button></td>
+    </tr>
+  `).join('');
+}
+
+document.getElementById('g-add').addEventListener('click', () => {
+  const name = document.getElementById('g-name').value.trim();
+  if(!name){ return; }
+  state.guests.push({
+    id: uid(),
+    name,
+    group: document.getElementById('g-group').value,
+    side: document.getElementById('g-side').value,
+    rsvp: document.getElementById('g-rsvp').value,
+    table: document.getElementById('g-table').value,
+    gift: document.getElementById('g-gift').value || state.meta.giftAverage,
+    notes: document.getElementById('g-notes').value.trim()
+  });
+  ['g-name','g-table','g-gift','g-notes'].forEach(id => document.getElementById(id).value='');
+  renderGuests(); renderDashboard(); saveState();
+});
+
+document.getElementById('g-body').addEventListener('click', (e) => {
+  const id = e.target.getAttribute('data-del-guest');
+  if(id){
+    state.guests = state.guests.filter(g=>g.id!==id);
+    renderGuests(); renderDashboard(); saveState();
+  }
+});
+
+// ---------- Schedule ----------
+function allPhases(){
+  const fromTasks = [...new Set(state.tasks.map(t=>t.phase))];
+  const merged = [...DEFAULT_PHASES];
+  fromTasks.forEach(p => { if(!merged.includes(p)) merged.push(p); });
+  return merged;
+}
+
+function renderSchedule(){
+  const phaseSelect = document.getElementById('t-phase');
+  phaseSelect.innerHTML = allPhases().map(p => `<option>${p}</option>`).join('');
+
+  const list = document.getElementById('phase-list');
+  const phases = allPhases();
+  list.innerHTML = phases.map(phase => {
+    const tasks = state.tasks.filter(t=>t.phase===phase);
+    const done = tasks.filter(t=>t.done).length;
+    const pct = tasks.length ? Math.round(done/tasks.length*100) : 0;
+    const rows = tasks.length ? tasks.map(t => `
+      <div class="wt-task-row ${t.done?'done':''}" data-id="${t.id}">
+        <input type="checkbox" data-toggle-task="${t.id}" ${t.done?'checked':''}>
+        <span class="title">${escapeHtml(t.title)}</span>
+        <span class="due">${t.due||''}</span>
+        <button class="danger" data-del-task="${t.id}">削除</button>
+      </div>
+    `).join('') : '<div class="wt-empty">タスクなし</div>';
+    return `
+      <div class="wt-panel wt-phase">
+        <div class="wt-phase-head">
+          <span class="name">${phase}</span>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span class="wt-small">${done}/${tasks.length}</span>
+            <div class="wt-phase-bar"><div class="fill" style="width:${pct}%;"></div></div>
+          </div>
+        </div>
+        ${rows}
+      </div>
+    `;
+  }).join('');
+}
+
+document.getElementById('t-add').addEventListener('click', () => {
+  const title = document.getElementById('t-title').value.trim();
+  if(!title){ return; }
+  state.tasks.push({
+    id: uid(),
+    phase: document.getElementById('t-phase').value,
+    title,
+    due: document.getElementById('t-due').value,
+    done: false
+  });
+  document.getElementById('t-title').value='';
+  document.getElementById('t-due').value='';
+  renderSchedule(); renderDashboard(); saveState();
+});
+
+document.getElementById('phase-list').addEventListener('click', (e) => {
+  const toggleId = e.target.getAttribute('data-toggle-task');
+  if(toggleId){
+    const t = state.tasks.find(x=>x.id===toggleId);
+    if(t){ t.done = !t.done; renderSchedule(); renderDashboard(); saveState(); }
+    return;
+  }
+  const delId = e.target.getAttribute('data-del-task');
+  if(delId){
+    state.tasks = state.tasks.filter(x=>x.id!==delId);
+    renderSchedule(); renderDashboard(); saveState();
+  }
+});
+
+// ---------- Budget ----------
+function renderBudget(){
+  const budgetTotal = state.budget.reduce((s,b)=>s+(Number(b.budgeted)||0),0);
+  const actualTotal = state.budget.reduce((s,b)=>s+(Number(b.actual)||0),0);
+  const giftTotal = state.guests.filter(g=>g.rsvp==='出席').reduce((s,g)=>s+(Number(g.gift)||0),0);
+  const net = actualTotal - giftTotal;
+
+  document.getElementById('net-panel').innerHTML = `
+    <div class="item"><div class="l">総予算</div><div class="v">${yen(budgetTotal)}</div></div>
+    <div class="sep"></div>
+    <div class="item"><div class="l">実支出計</div><div class="v">${yen(actualTotal)}</div></div>
+    <div class="sep"></div>
+    <div class="item"><div class="l">ご祝儀見込み</div><div class="v">${yen(giftTotal)}</div></div>
+    <div class="sep"></div>
+    <div class="item"><div class="l">実質負担</div><div class="v">${yen(net)}</div></div>
+  `;
+
+  document.getElementById('b-body').innerHTML = state.budget.map(b => {
+    const diff = (Number(b.budgeted)||0) - (Number(b.actual)||0);
+    return `
+    <tr data-id="${b.id}">
+      <td>${escapeHtml(b.category)}</td>
+      <td>${yen(b.budgeted)}</td>
+      <td>${b.actual ? yen(b.actual) : '-'}</td>
+      <td style="color:${diff<0?'var(--plum)':'var(--sage)'}">${b.actual ? yen(diff) : '-'}</td>
+      <td>${escapeHtml(b.note)}</td>
+      <td><button class="danger" data-del-budget="${b.id}">削除</button></td>
+    </tr>
+  `;}).join('');
+}
+
+document.getElementById('b-add').addEventListener('click', () => {
+  const cat = document.getElementById('b-cat').value.trim();
+  if(!cat){ return; }
+  state.budget.push({
+    id: uid(),
+    category: cat,
+    budgeted: document.getElementById('b-budget').value || 0,
+    actual: document.getElementById('b-actual').value || 0,
+    note: document.getElementById('b-note').value.trim()
+  });
+  ['b-cat','b-budget','b-actual','b-note'].forEach(id => document.getElementById(id).value='');
+  renderBudget(); renderDashboard(); saveState();
+});
+
+document.getElementById('b-body').addEventListener('click', (e) => {
+  const id = e.target.getAttribute('data-del-budget');
+  if(id){
+    state.budget = state.budget.filter(b=>b.id!==id);
+    renderBudget(); renderDashboard(); saveState();
+  }
+});
+
+// ---------- Nav ----------
+document.querySelectorAll('.wt-nav-item').forEach(item => {
+  item.addEventListener('click', () => {
+    document.querySelectorAll('.wt-nav-item').forEach(i=>i.classList.remove('active'));
+    document.querySelectorAll('.wt-section').forEach(s=>s.classList.remove('active'));
+    item.classList.add('active');
+    document.getElementById('sec-'+item.getAttribute('data-tab')).classList.add('active');
+  });
+});
+
+initFirebaseSync();
+</script>
+</body>
+</html>
