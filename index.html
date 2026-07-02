@@ -296,13 +296,19 @@ function renderAll(){
 }
 
 // ---------- Dashboard ----------
+function computeBudgetSummary(){
+  const budgetTotal = state.budget.reduce((s,b)=>s+(Number(b.budgeted)||0),0);
+  const actualTotal = state.budget.reduce((s,b)=>s+(Number(b.actual)||0),0);
+  const giftTotal = state.guests.filter(g=>g.rsvp==='出席').reduce((s,g)=>s+(Number(g.gift)||0),0);
+  const net = actualTotal - giftTotal;
+  return { budgetTotal, actualTotal, giftTotal, net };
+}
+
 function renderDashboard(){
   const total = state.guests.length;
   const att = state.guests.filter(g=>g.rsvp==='出席').length;
   const dec = state.guests.filter(g=>g.rsvp==='欠席').length;
-  const giftTotal = state.guests.filter(g=>g.rsvp==='出席').reduce((s,g)=>s+(Number(g.gift)||0),0);
-  const actualTotal = state.budget.reduce((s,b)=>s+(Number(b.actual)||0),0);
-  const netOutOfPocket = actualTotal - giftTotal;
+  const summary = computeBudgetSummary();
   const doneTasks = state.tasks.filter(t=>t.done).length;
   const totalTasks = state.tasks.length;
 
@@ -310,8 +316,8 @@ function renderDashboard(){
     ['総ゲスト数', total, ''],
     ['出席', att, 'sage'],
     ['欠席', dec, 'plum'],
-    ['持ち出し金額', yen(netOutOfPocket), netOutOfPocket>0?'plum':'sage'],
-    ['ご祝儀見込み', yen(giftTotal), 'sage'],
+    ['予算合計', yen(summary.budgetTotal), ''],
+    ['ご祝儀見込み', yen(summary.giftTotal), 'sage'],
     ['タスク進捗', doneTasks + ' / ' + totalTasks, '']
   ];
   document.getElementById('dash-cards').innerHTML = cards.map(([l,v,cls]) =>
@@ -455,10 +461,7 @@ document.getElementById('phase-list').addEventListener('click', (e) => {
 
 // ---------- Budget ----------
 function renderBudget(){
-  const budgetTotal = state.budget.reduce((s,b)=>s+(Number(b.budgeted)||0),0);
-  const actualTotal = state.budget.reduce((s,b)=>s+(Number(b.actual)||0),0);
-  const giftTotal = state.guests.filter(g=>g.rsvp==='出席').reduce((s,g)=>s+(Number(g.gift)||0),0);
-  const net = actualTotal - giftTotal;
+  const { budgetTotal, actualTotal, giftTotal, net } = computeBudgetSummary();
 
   document.getElementById('net-panel').innerHTML = `
     <div class="item"><div class="l">総予算</div><div class="v">${yen(budgetTotal)}</div></div>
