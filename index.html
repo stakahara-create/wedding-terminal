@@ -30,7 +30,7 @@
 }
 *{box-sizing:border-box;}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:'Noto Sans JP',sans-serif;}
-.wt-app{display:flex;min-height:640px;max-width:1180px;margin:0 auto;border:1px solid var(--border);background:var(--surface);}
+.wt-app{display:flex;min-height:100vh;background:var(--surface);}
 .wt-side{width:200px;flex-shrink:0;background:var(--navy);color:#EFE9D8;padding:28px 0;}
 .wt-brand{font-family:'Shippori Mincho',serif;font-size:20px;font-weight:700;padding:0 24px 22px;border-bottom:1px solid rgba(239,233,216,0.18);margin-bottom:18px;letter-spacing:0.04em;}
 .wt-brand small{display:block;font-family:'Noto Sans JP',sans-serif;font-weight:400;font-size:11px;color:var(--gold-soft);margin-top:4px;letter-spacing:0.12em;}
@@ -38,7 +38,8 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:'Noto Sans JP',s
 .wt-nav-item:hover{background:rgba(255,255,255,0.05);}
 .wt-nav-item.active{background:rgba(255,255,255,0.08);border-left-color:var(--gold);color:#FFFDF6;font-weight:500;}
 .wt-nav-dot{width:6px;height:6px;border-radius:50%;background:var(--gold-soft);opacity:.7;}
-.wt-main{flex:1;padding:30px 36px;min-width:0;}
+.wt-main{flex:1;padding:30px 40px;min-width:0;display:flex;flex-direction:column;align-items:center;}
+.wt-main > *{width:100%;max-width:1080px;}
 .wt-header{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:22px;border-bottom:1px dashed var(--border);padding-bottom:16px;}
 .wt-title{font-family:'Shippori Mincho',serif;font-size:22px;font-weight:700;color:var(--navy);margin:0;}
 .wt-sub{font-size:12px;color:var(--ink-soft);margin-top:4px;}
@@ -299,8 +300,9 @@ function renderDashboard(){
   const total = state.guests.length;
   const att = state.guests.filter(g=>g.rsvp==='出席').length;
   const dec = state.guests.filter(g=>g.rsvp==='欠席').length;
-  const pen = state.guests.filter(g=>g.rsvp==='未定').length;
   const giftTotal = state.guests.filter(g=>g.rsvp==='出席').reduce((s,g)=>s+(Number(g.gift)||0),0);
+  const actualTotal = state.budget.reduce((s,b)=>s+(Number(b.actual)||0),0);
+  const netOutOfPocket = actualTotal - giftTotal;
   const doneTasks = state.tasks.filter(t=>t.done).length;
   const totalTasks = state.tasks.length;
 
@@ -308,7 +310,7 @@ function renderDashboard(){
     ['総ゲスト数', total, ''],
     ['出席', att, 'sage'],
     ['欠席', dec, 'plum'],
-    ['未定', pen, ''],
+    ['持ち出し金額', yen(netOutOfPocket), netOutOfPocket>0?'plum':'sage'],
     ['ご祝儀見込み', yen(giftTotal), 'sage'],
     ['タスク進捗', doneTasks + ' / ' + totalTasks, '']
   ];
