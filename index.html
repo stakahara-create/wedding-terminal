@@ -69,6 +69,7 @@ button{font-family:'Noto Sans JP',sans-serif;cursor:pointer;border-radius:6px;bo
 button:hover{background:var(--navy-light);}
 button.ghost{background:transparent;color:var(--navy);border:1px solid var(--border);}
 button.ghost:hover{background:var(--surface-soft);}
+button.ghost.active{background:var(--navy);color:#fff;border-color:var(--navy);}
 button.danger{background:transparent;color:var(--plum);border:1px solid var(--plum-bg);padding:4px 8px;font-size:12px;}
 button.danger:hover{background:var(--plum-bg);}
 .wt-form-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;}
@@ -139,6 +140,11 @@ button.danger:hover{background:var(--plum-bg);}
       </div>
       <div class="wt-panel">
         <h3>ゲスト一覧 <span class="wt-small" id="g-count"></span></h3>
+        <div class="wt-form-row" id="g-filter" style="margin-bottom:14px;">
+          <button type="button" class="ghost" data-filter="全体">全体</button>
+          <button type="button" class="ghost" data-filter="新郎側">新郎側</button>
+          <button type="button" class="ghost" data-filter="新婦側">新婦側</button>
+        </div>
         <table class="wt-table">
           <thead><tr><th>氏名</th><th>属性</th><th>側</th><th>出欠</th><th>卓</th><th>ご祝儀予想</th><th>備考</th><th></th></tr></thead>
           <tbody id="g-body"></tbody>
@@ -340,17 +346,25 @@ function escapeHtml(s){
 }
 
 // ---------- Guests ----------
+let guestSideFilter = '全体';
+
 function renderGuests(){
   const body = document.getElementById('g-body');
   const empty = document.getElementById('g-empty');
-  document.getElementById('g-count').textContent = '(' + state.guests.length + '名)';
-  if(state.guests.length===0){
+  const filtered = guestSideFilter==='全体' ? state.guests : state.guests.filter(g=>g.side===guestSideFilter);
+  document.getElementById('g-count').textContent =
+    guestSideFilter==='全体' ? `(${state.guests.length}名)` : `(${filtered.length}名 / 全体${state.guests.length}名)`;
+  document.querySelectorAll('#g-filter button').forEach(b => {
+    b.classList.toggle('active', b.getAttribute('data-filter')===guestSideFilter);
+  });
+  if(filtered.length===0){
     body.innerHTML = '';
     empty.style.display='block';
+    empty.textContent = state.guests.length===0 ? 'まだゲストが登録されていません。上のフォームから追加してください。' : '該当するゲストがいません。';
     return;
   }
   empty.style.display='none';
-  body.innerHTML = state.guests.map(g => `
+  body.innerHTML = filtered.map(g => `
     <tr data-id="${g.id}">
       <td>${escapeHtml(g.name)}</td>
       <td>${escapeHtml(g.group)}</td>
@@ -379,6 +393,14 @@ document.getElementById('g-add').addEventListener('click', () => {
   });
   ['g-name','g-table','g-gift','g-notes'].forEach(id => document.getElementById(id).value='');
   renderGuests(); renderDashboard(); saveState();
+});
+
+document.getElementById('g-filter').addEventListener('click', (e) => {
+  const f = e.target.getAttribute('data-filter');
+  if(f){
+    guestSideFilter = f;
+    renderGuests();
+  }
 });
 
 document.getElementById('g-body').addEventListener('click', (e) => {
