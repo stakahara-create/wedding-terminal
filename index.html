@@ -44,7 +44,8 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:'Noto Sans JP',s
 .wt-sub{font-size:12px;color:var(--ink-soft);margin-top:4px;}
 .wt-section{display:none;}
 .wt-section.active{display:block;}
-.wt-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:24px;}
+.wt-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px;}
+@media (max-width:640px){.wt-grid{grid-template-columns:repeat(2,1fr);}}
 .wt-card{background:var(--surface-soft);border-radius:var(--radius);padding:14px 16px;border:1px solid var(--border);}
 .wt-card .l{font-size:11px;color:var(--ink-soft);letter-spacing:.04em;margin-bottom:6px;}
 .wt-card .v{font-family:'Shippori Mincho',serif;font-size:22px;font-weight:700;color:var(--navy);}
