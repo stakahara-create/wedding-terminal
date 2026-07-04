@@ -168,6 +168,7 @@ button.danger:hover{background:var(--plum-bg);}
     <div class="wt-nav-item" data-tab="schedule"><span class="wt-nav-dot"></span>スケジュール</div>
     <div class="wt-nav-item" data-tab="calendar"><span class="wt-nav-dot"></span>カレンダー</div>
     <div class="wt-nav-item" data-tab="budget"><span class="wt-nav-dot"></span>予算管理</div>
+    <div class="wt-nav-item" data-tab="memo"><span class="wt-nav-dot"></span>メモ</div>
   </div>
   <div class="wt-main">
 
@@ -289,9 +290,17 @@ button.danger:hover{background:var(--plum-bg);}
         </table>
         </div>
       </div>
+    </div>
+
+    <div id="sec-memo" class="wt-section">
+      <div class="wt-header">
+        <div>
+          <p class="wt-title">メモ</p>
+          <p class="wt-sub">見積もりの根拠、支払いタイミング、思いついたことなど自由に記録できます</p>
+        </div>
+      </div>
       <div class="wt-panel">
-        <h3>メモ</h3>
-        <textarea id="budget-memo" placeholder="予算全体に関するメモ(見積もりの根拠、支払いタイミング、値引き交渉の状況など)" style="width:100%;min-height:120px;resize:vertical;"></textarea>
+        <textarea id="memo-textarea" placeholder="ここに自由にメモを書いてください" style="width:100%;min-height:400px;resize:vertical;"></textarea>
       </div>
     </div>
 
@@ -367,7 +376,7 @@ let state = {
   tasks: [],
   budget: [],
   events: [],
-  budgetMemo: '',
+  memo: '',
   meta: { giftAverage: 30000, weddingDate: '2026-11-14' }
 };
 
@@ -413,7 +422,8 @@ function initFirebaseSync(){
         suppressNextSnapshot = false;
       }
       if(val){
-        state = Object.assign({ guests:[], tasks:[], budget:[], events:[], budgetMemo:'', meta:{ giftAverage:30000, weddingDate:'2026-11-14' } }, val);
+        state = Object.assign({ guests:[], tasks:[], budget:[], events:[], memo:'', meta:{ giftAverage:30000, weddingDate:'2026-11-14' } }, val);
+        if(state.memo === undefined || state.memo === ''){ state.memo = val.budgetMemo || ''; }
         state.meta = Object.assign({ giftAverage:30000, weddingDate:'2026-11-14' }, val.meta || {});
         if(!state.events) state.events = [];
         state.budget = (state.budget || []).map(normalizeBudgetItem);
@@ -451,6 +461,7 @@ function renderAll(){
   renderSchedule();
   renderCalendar();
   renderBudget();
+  renderMemo();
   checkUpcomingEvents();
 }
 
@@ -901,10 +912,6 @@ document.getElementById('phase-list').addEventListener('click', (e) => {
 // ---------- Budget ----------
 function renderBudget(){
   const { budgetTotal, giftConfirmed, giftProjected, net, netProjected } = computeBudgetSummary();
-  const memoEl = document.getElementById('budget-memo');
-  if(document.activeElement !== memoEl){
-    memoEl.value = state.budgetMemo || '';
-  }
 
   document.getElementById('net-panel').innerHTML = `
     <div class="item"><div class="l">総予算</div><div class="v">${yen(budgetTotal)}</div></div>
@@ -936,8 +943,15 @@ function renderBudget(){
   `;}).join('');
 }
 
-document.getElementById('budget-memo').addEventListener('input', (e) => {
-  state.budgetMemo = e.target.value;
+function renderMemo(){
+  const memoEl = document.getElementById('memo-textarea');
+  if(document.activeElement !== memoEl){
+    memoEl.value = state.memo || '';
+  }
+}
+
+document.getElementById('memo-textarea').addEventListener('input', (e) => {
+  state.memo = e.target.value;
   saveState();
 });
 
