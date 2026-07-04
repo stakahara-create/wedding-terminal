@@ -266,25 +266,31 @@ button.danger:hover{background:var(--plum-bg);}
       <div class="wt-header">
         <div>
           <p class="wt-title">予算管理</p>
-          <p class="wt-sub">支出とご祝儀見込みの収支</p>
+          <p class="wt-sub">支出とご祝儀見込みの収支(人数が変わると予算額は自動で再計算されます)</p>
         </div>
       </div>
       <div class="wt-net-panel" id="net-panel"></div>
       <div class="wt-panel">
         <h3>費目を追加</h3>
         <div class="wt-form-row">
-          <input id="b-cat" placeholder="費目(例: 会場費)">
-          <input id="b-budget" type="number" placeholder="予算額(円)">
-          <input id="b-actual" type="number" placeholder="実費(円・未確定なら空欄)">
+          <input id="b-cat" placeholder="費目(例: 料理・会場費)" style="flex:1.4;">
+          <input id="b-price" type="number" placeholder="単価(円)">
+          <select id="b-countmode">
+            <option value="manual">人数: 手動指定</option>
+            <option value="all">人数: 全ゲスト(出席+未定)</option>
+            <option value="exFamily">人数: ゲスト-親族</option>
+          </select>
+          <input id="b-manualcount" type="number" placeholder="人数" value="1" style="max-width:80px;">
           <input id="b-note" placeholder="メモ">
           <button id="b-add">追加</button>
         </div>
+        <p class="wt-small">例: 料理・ケーキ・フリードリンクは「全ゲスト」、引き出物・引き菓子・エコバッグは「ゲスト-親族」、会場費など固定費は「手動指定(人数1)」がおすすめです。</p>
       </div>
       <div class="wt-panel">
         <h3>費目一覧</h3>
         <div class="wt-table-scroll">
         <table class="wt-table">
-          <thead><tr><th>費目</th><th>予算額</th><th>実費</th><th>差額</th><th>メモ</th><th></th></tr></thead>
+          <thead><tr><th>費目</th><th>単価</th><th>人数</th><th>予算額</th><th>実費</th><th>差額</th><th>メモ</th><th></th></tr></thead>
           <tbody id="b-body"></tbody>
         </table>
         </div>
@@ -383,8 +389,22 @@ function seedIfEmpty(){
     state.tasks = seed.map(([phase,title]) => ({ id: uid(), phase, title, done:false, due:'' }));
   }
   if(state.budget.length === 0){
-    const cats = ['会場費','衣装','写真・映像','引き出物','装花','お車代・お礼'];
-    state.budget = cats.map(c => ({ id: uid(), category:c, budgeted:0, actual:0, note:'' }));
+    const items = [
+      ['会場費','manual',1],
+      ['衣装','manual',1],
+      ['写真・映像','manual',1],
+      ['料理','all',1],
+      ['ウェディングケーキ','all',1],
+      ['フリードリンク','all',1],
+      ['引き出物','exFamily',1],
+      ['引き菓子','exFamily',1],
+      ['エコバッグ','exFamily',1],
+      ['装花','manual',1],
+      ['お車代・お礼','manual',1]
+    ];
+    state.budget = items.map(([category,countMode,manualCount]) => ({
+      id: uid(), category, unitPrice:0, countMode, manualCount, actual:0, note:''
+    }));
   }
 }
 
@@ -409,6 +429,7 @@ function initFirebaseSync(){
         state = Object.assign({ guests:[], tasks:[], budget:[], events:[], meta:{ giftAverage:30000, weddingDate:'2026-11-14' } }, val);
         state.meta = Object.assign({ giftAverage:30000, weddingDate:'2026-11-14' }, val.meta || {});
         if(!state.events) state.events = [];
+        state.budget = (state.budget || []).map(normalizeBudgetItem);
       } else if(firstLoad){
         seedIfEmpty();
         pushState();
@@ -448,13 +469,54 @@ function renderAll(){
 
 // ---------- Dashboard ----------
 function computeBudgetSummary(){
-  const budgetTotal = state.budget.reduce((s,b)=>s+(Number(b.budgeted)||0),0);
+  const budgetTotal = state.budget.reduce((s,b)=>s+budgetItemTotal(b),0);
   const actualTotal = state.budget.reduce((s,b)=>s+(Number(b.actual)||0),0);
   const giftConfirmed = state.guests.filter(g=>g.rsvp==='出席').reduce((s,g)=>s+(Number(g.gift)||0),0);
   const giftProjected = state.guests.filter(g=>g.rsvp==='出席'||g.rsvp==='未定').reduce((s,g)=>s+(Number(g.gift)||0),0);
   const net = actualTotal - giftConfirmed;
   const netProjected = actualTotal - giftProjected;
   return { budgetTotal, actualTotal, giftConfirmed, giftProjected, net, netProjected };
+}
+
+function getGuestCounts(){
+  const notDeclined = state.guests.filter(g => g.rsvp !== '欠席');
+  const all = notDeclined.length;
+  const family = notDeclined.filter(g => g.group === '親族').length;
+  return { all, exFamily: all - family };
+}
+
+function budgetItemCount(b){
+  const counts = getGuestCounts();
+  if(b.countMode === 'all') return counts.all;
+  if(b.countMode === 'exFamily') return counts.exFamily;
+  return Number(b.manualCount) || 0;
+}
+
+function budgetItemTotal(b){
+  return (Number(b.unitPrice) || 0) * budgetItemCount(b);
+}
+
+function normalizeBudgetItem(b){
+  const hasNewSchema = b.unitPrice !== undefined || b.countMode !== undefined;
+  if(hasNewSchema){
+    return {
+      id: b.id, category: b.category || '',
+      unitPrice: Number(b.unitPrice) || 0,
+      countMode: b.countMode || 'manual',
+      manualCount: b.manualCount !== undefined ? Number(b.manualCount) : 1,
+      actual: Number(b.actual) || 0,
+      note: b.note || ''
+    };
+  }
+  // 旧データ(単価×人数を導入する前の予算額のみのデータ)を手動人数1件として移行
+  return {
+    id: b.id, category: b.category || '',
+    unitPrice: Number(b.budgeted) || 0,
+    countMode: 'manual',
+    manualCount: 1,
+    actual: Number(b.actual) || 0,
+    note: b.note || ''
+  };
 }
 
 function renderDashboard(){
@@ -744,7 +806,7 @@ document.getElementById('g-add').addEventListener('click', () => {
     notes: document.getElementById('g-notes').value.trim()
   });
   ['g-name','g-table','g-gift','g-notes'].forEach(id => document.getElementById(id).value='');
-  renderGuests(); renderDashboard(); saveState();
+  renderGuests(); renderDashboard(); renderBudget(); saveState();
 });
 
 document.getElementById('g-filter').addEventListener('click', (e) => {
@@ -761,7 +823,7 @@ document.getElementById('g-body').addEventListener('click', (e) => {
   const id = e.target.getAttribute('data-del-guest');
   if(id){
     state.guests = state.guests.filter(g=>g.id!==id);
-    renderGuests(); renderDashboard(); saveState();
+    renderGuests(); renderDashboard(); renderBudget(); saveState();
   }
 });
 
@@ -793,7 +855,7 @@ document.getElementById('ge-save').addEventListener('click', () => {
   g.gift = document.getElementById('ge-gift').value || state.meta.giftAverage;
   g.notes = document.getElementById('ge-notes').value.trim();
   document.getElementById('wt-guest-edit-overlay').style.display = 'none';
-  renderGuests(); renderDashboard(); saveState();
+  renderGuests(); renderDashboard(); renderBudget(); saveState();
 });
 
 document.getElementById('ge-cancel').addEventListener('click', () => {
@@ -888,15 +950,30 @@ function renderBudget(){
     <div class="item"><div class="l">実質負担(確定ベース)</div><div class="v">${yen(net)}</div></div>
   `;
 
+  const counts = getGuestCounts();
   document.getElementById('b-body').innerHTML = state.budget.map(b => {
-    const diff = (Number(b.budgeted)||0) - (Number(b.actual)||0);
+    const count = budgetItemCount(b);
+    const total = budgetItemTotal(b);
+    const diff = total - (Number(b.actual)||0);
+    const countCell = b.countMode === 'manual'
+      ? `<input type="number" value="${b.manualCount}" data-field="manualCount" data-id="${b.id}" style="width:60px;">`
+      : `<span class="wt-small">${count}人</span>`;
     return `
     <tr data-id="${b.id}">
-      <td>${escapeHtml(b.category)}</td>
-      <td>${yen(b.budgeted)}</td>
-      <td>${b.actual ? yen(b.actual) : '-'}</td>
-      <td style="color:${diff<0?'var(--plum)':'var(--sage)'}">${b.actual ? yen(diff) : '-'}</td>
-      <td>${escapeHtml(b.note)}</td>
+      <td><input type="text" value="${escapeHtml(b.category)}" data-field="category" data-id="${b.id}" style="width:120px;"></td>
+      <td><input type="number" value="${b.unitPrice}" data-field="unitPrice" data-id="${b.id}" style="width:90px;"></td>
+      <td>
+        <select data-field="countMode" data-id="${b.id}">
+          <option value="manual" ${b.countMode==='manual'?'selected':''}>手動</option>
+          <option value="all" ${b.countMode==='all'?'selected':''}>全ゲスト(${counts.all})</option>
+          <option value="exFamily" ${b.countMode==='exFamily'?'selected':''}>ゲスト-親族(${counts.exFamily})</option>
+        </select>
+        ${countCell}
+      </td>
+      <td><b>${yen(total)}</b></td>
+      <td><input type="number" value="${b.actual}" data-field="actual" data-id="${b.id}" style="width:100px;"></td>
+      <td style="color:${diff<0?'var(--plum)':'var(--sage)'}">${yen(diff)}</td>
+      <td><input type="text" value="${escapeHtml(b.note)}" data-field="note" data-id="${b.id}" style="width:110px;"></td>
       <td><button class="danger" data-del-budget="${b.id}">削除</button></td>
     </tr>
   `;}).join('');
@@ -908,11 +985,15 @@ document.getElementById('b-add').addEventListener('click', () => {
   state.budget.push({
     id: uid(),
     category: cat,
-    budgeted: document.getElementById('b-budget').value || 0,
-    actual: document.getElementById('b-actual').value || 0,
+    unitPrice: document.getElementById('b-price').value || 0,
+    countMode: document.getElementById('b-countmode').value,
+    manualCount: document.getElementById('b-manualcount').value || 1,
+    actual: 0,
     note: document.getElementById('b-note').value.trim()
   });
-  ['b-cat','b-budget','b-actual','b-note'].forEach(id => document.getElementById(id).value='');
+  ['b-cat','b-price','b-note'].forEach(id => document.getElementById(id).value='');
+  document.getElementById('b-countmode').value = 'manual';
+  document.getElementById('b-manualcount').value = 1;
   renderBudget(); renderDashboard(); saveState();
 });
 
@@ -922,6 +1003,22 @@ document.getElementById('b-body').addEventListener('click', (e) => {
     state.budget = state.budget.filter(b=>b.id!==id);
     renderBudget(); renderDashboard(); saveState();
   }
+});
+
+document.getElementById('b-body').addEventListener('change', (e) => {
+  const id = e.target.getAttribute('data-id');
+  const field = e.target.getAttribute('data-field');
+  if(!id || !field){ return; }
+  const b = state.budget.find(x => x.id === id);
+  if(!b){ return; }
+  if(field === 'category' || field === 'note'){
+    b[field] = e.target.value.trim();
+  }else if(field === 'countMode'){
+    b.countMode = e.target.value;
+  }else{
+    b[field] = Number(e.target.value) || 0;
+  }
+  renderBudget(); renderDashboard(); saveState();
 });
 
 // ---------- Nav ----------
