@@ -450,9 +450,10 @@ function renderAll(){
 function computeBudgetSummary(){
   const budgetTotal = state.budget.reduce((s,b)=>s+(Number(b.budgeted)||0),0);
   const actualTotal = state.budget.reduce((s,b)=>s+(Number(b.actual)||0),0);
-  const giftTotal = state.guests.filter(g=>g.rsvp==='出席').reduce((s,g)=>s+(Number(g.gift)||0),0);
-  const net = actualTotal - giftTotal;
-  return { budgetTotal, actualTotal, giftTotal, net };
+  const giftConfirmed = state.guests.filter(g=>g.rsvp==='出席').reduce((s,g)=>s+(Number(g.gift)||0),0);
+  const giftProjected = state.guests.filter(g=>g.rsvp==='出席'||g.rsvp==='未定').reduce((s,g)=>s+(Number(g.gift)||0),0);
+  const net = actualTotal - giftConfirmed;
+  return { budgetTotal, actualTotal, giftConfirmed, giftProjected, net };
 }
 
 function renderDashboard(){
@@ -464,17 +465,22 @@ function renderDashboard(){
   const doneTasks = state.tasks.filter(t=>t.done).length;
   const totalTasks = state.tasks.length;
 
-  const cards = [
-    ['総ゲスト数', total, ''],
-    ['出席', att, 'sage'],
-    ['欠席', dec, 'plum'],
-    ['予算合計', yen(summary.budgetTotal), ''],
-    ['ご祝儀見込み', yen(summary.giftTotal), 'sage'],
-    ['タスク進捗', doneTasks + ' / ' + totalTasks, '']
-  ];
-  document.getElementById('dash-cards').innerHTML = cards.map(([l,v,cls]) =>
-    `<div class="wt-card"><div class="l">${l}</div><div class="v ${cls}">${v}</div></div>`
-  ).join('');
+  const card = (l,v,cls) => `<div class="wt-card"><div class="l">${l}</div><div class="v ${cls||''}">${v}</div></div>`;
+  const giftCard = `<div class="wt-card">
+    <div class="l">ご祝儀</div>
+    <div style="display:flex;justify-content:space-between;gap:8px;">
+      <div><div class="wt-small">見込み(未定含む)</div><div class="v sage" style="font-size:17px;">${yen(summary.giftProjected)}</div></div>
+      <div><div class="wt-small">確定(出席)</div><div class="v" style="font-size:17px;">${yen(summary.giftConfirmed)}</div></div>
+    </div>
+  </div>`;
+
+  document.getElementById('dash-cards').innerHTML =
+    card('総ゲスト数', total) +
+    card('出席', att, 'sage') +
+    card('欠席', dec, 'plum') +
+    card('予算合計', yen(summary.budgetTotal)) +
+    giftCard +
+    card('タスク進捗', doneTasks + ' / ' + totalTasks);
 
   const pending = state.tasks.filter(t=>!t.done).slice(0,8);
   const dashTasks = document.getElementById('dash-tasks');
@@ -865,16 +871,18 @@ document.getElementById('phase-list').addEventListener('click', (e) => {
 
 // ---------- Budget ----------
 function renderBudget(){
-  const { budgetTotal, actualTotal, giftTotal, net } = computeBudgetSummary();
+  const { budgetTotal, actualTotal, giftConfirmed, giftProjected, net } = computeBudgetSummary();
 
   document.getElementById('net-panel').innerHTML = `
     <div class="item"><div class="l">総予算</div><div class="v">${yen(budgetTotal)}</div></div>
     <div class="sep"></div>
     <div class="item"><div class="l">実支出計</div><div class="v">${yen(actualTotal)}</div></div>
     <div class="sep"></div>
-    <div class="item"><div class="l">ご祝儀見込み</div><div class="v">${yen(giftTotal)}</div></div>
+    <div class="item"><div class="l">ご祝儀見込み(未定含む)</div><div class="v">${yen(giftProjected)}</div></div>
     <div class="sep"></div>
-    <div class="item"><div class="l">実質負担</div><div class="v">${yen(net)}</div></div>
+    <div class="item"><div class="l">ご祝儀確定(出席)</div><div class="v">${yen(giftConfirmed)}</div></div>
+    <div class="sep"></div>
+    <div class="item"><div class="l">実質負担(確定ベース)</div><div class="v">${yen(net)}</div></div>
   `;
 
   document.getElementById('b-body').innerHTML = state.budget.map(b => {
