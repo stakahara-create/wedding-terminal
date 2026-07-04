@@ -273,7 +273,7 @@ button.danger:hover{background:var(--plum-bg);}
       <div class="wt-panel">
         <h3>費目を追加</h3>
         <div class="wt-form-row">
-          <input id="b-cat" placeholder="費目(例: 料理・引き出物)" style="flex:1.4;">
+          <input id="b-cat" placeholder="費目(例: 料理・引き出物)" style="flex:2.5;">
           <input id="b-price" type="number" placeholder="単価(円)">
           <input id="b-count" type="number" placeholder="人数・個数" value="1" style="max-width:100px;">
           <input id="b-note" placeholder="メモ">
@@ -284,10 +284,14 @@ button.danger:hover{background:var(--plum-bg);}
         <h3>費目一覧</h3>
         <div class="wt-table-scroll">
         <table class="wt-table">
-          <thead><tr><th>費目</th><th>単価</th><th>人数・個数</th><th>予算額</th><th>メモ</th><th></th></tr></thead>
+          <thead><tr><th></th><th>費目</th><th>単価</th><th>人数・個数</th><th>予算額</th><th>メモ</th><th></th></tr></thead>
           <tbody id="b-body"></tbody>
         </table>
         </div>
+      </div>
+      <div class="wt-panel">
+        <h3>メモ</h3>
+        <textarea id="budget-memo" placeholder="予算全体に関するメモ(見積もりの根拠、支払いタイミング、値引き交渉の状況など)" style="width:100%;min-height:120px;resize:vertical;"></textarea>
       </div>
     </div>
 
@@ -363,6 +367,7 @@ let state = {
   tasks: [],
   budget: [],
   events: [],
+  budgetMemo: '',
   meta: { giftAverage: 30000, weddingDate: '2026-11-14' }
 };
 
@@ -408,7 +413,7 @@ function initFirebaseSync(){
         suppressNextSnapshot = false;
       }
       if(val){
-        state = Object.assign({ guests:[], tasks:[], budget:[], events:[], meta:{ giftAverage:30000, weddingDate:'2026-11-14' } }, val);
+        state = Object.assign({ guests:[], tasks:[], budget:[], events:[], budgetMemo:'', meta:{ giftAverage:30000, weddingDate:'2026-11-14' } }, val);
         state.meta = Object.assign({ giftAverage:30000, weddingDate:'2026-11-14' }, val.meta || {});
         if(!state.events) state.events = [];
         state.budget = (state.budget || []).map(normalizeBudgetItem);
@@ -896,6 +901,10 @@ document.getElementById('phase-list').addEventListener('click', (e) => {
 // ---------- Budget ----------
 function renderBudget(){
   const { budgetTotal, giftConfirmed, giftProjected, net, netProjected } = computeBudgetSummary();
+  const memoEl = document.getElementById('budget-memo');
+  if(document.activeElement !== memoEl){
+    memoEl.value = state.budgetMemo || '';
+  }
 
   document.getElementById('net-panel').innerHTML = `
     <div class="item"><div class="l">総予算</div><div class="v">${yen(budgetTotal)}</div></div>
@@ -909,11 +918,15 @@ function renderBudget(){
     <div class="item"><div class="l">実質負担(確定ベース)</div><div class="v">${yen(net)}</div></div>
   `;
 
-  document.getElementById('b-body').innerHTML = state.budget.map(b => {
+  document.getElementById('b-body').innerHTML = state.budget.map((b, idx) => {
     const total = budgetItemTotal(b);
     return `
     <tr data-id="${b.id}">
-      <td><input type="text" value="${escapeHtml(b.category)}" data-field="category" data-id="${b.id}" style="width:130px;"></td>
+      <td>
+        <button type="button" class="ghost" data-move-up="${b.id}" style="padding:2px 7px;font-size:11px;" ${idx===0?'disabled':''}>▲</button>
+        <button type="button" class="ghost" data-move-down="${b.id}" style="padding:2px 7px;font-size:11px;" ${idx===state.budget.length-1?'disabled':''}>▼</button>
+      </td>
+      <td><input type="text" value="${escapeHtml(b.category)}" data-field="category" data-id="${b.id}" style="width:220px;"></td>
       <td><input type="number" value="${b.unitPrice}" data-field="unitPrice" data-id="${b.id}" style="width:90px;"></td>
       <td><input type="number" value="${b.count}" data-field="count" data-id="${b.id}" style="width:80px;"></td>
       <td><b>${yen(total)}</b></td>
@@ -922,6 +935,11 @@ function renderBudget(){
     </tr>
   `;}).join('');
 }
+
+document.getElementById('budget-memo').addEventListener('input', (e) => {
+  state.budgetMemo = e.target.value;
+  saveState();
+});
 
 document.getElementById('b-add').addEventListener('click', () => {
   const cat = document.getElementById('b-cat').value.trim();
@@ -939,6 +957,17 @@ document.getElementById('b-add').addEventListener('click', () => {
 });
 
 document.getElementById('b-body').addEventListener('click', (e) => {
+  const upId = e.target.getAttribute('data-move-up');
+  const downId = e.target.getAttribute('data-move-down');
+  if(upId || downId){
+    const id = upId || downId;
+    const idx = state.budget.findIndex(b => b.id === id);
+    const swapIdx = upId ? idx - 1 : idx + 1;
+    if(idx < 0 || swapIdx < 0 || swapIdx >= state.budget.length) return;
+    [state.budget[idx], state.budget[swapIdx]] = [state.budget[swapIdx], state.budget[idx]];
+    renderBudget(); saveState();
+    return;
+  }
   const id = e.target.getAttribute('data-del-budget');
   if(id){
     state.budget = state.budget.filter(b=>b.id!==id);
