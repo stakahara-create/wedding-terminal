@@ -303,7 +303,30 @@ button.danger:hover{background:var(--plum-bg);}
   </div>
 </div>
 
-<div class="wt-popup-overlay" id="wt-day-overlay" style="display:none;">
+<div class="wt-popup-overlay" id="wt-guest-edit-overlay" style="display:none;">
+  <div class="wt-popup" style="max-width:480px;">
+    <h3>ゲスト情報を編集</h3>
+    <div class="wt-form-row">
+      <input id="ge-name" placeholder="氏名" style="flex:2;">
+    </div>
+    <div class="wt-form-row">
+      <select id="ge-group"><option>親族</option><option>友人</option><option>職場</option><option>その他</option></select>
+      <select id="ge-side"><option>新郎側</option><option>新婦側</option></select>
+      <select id="ge-rsvp"><option>未定</option><option>出席</option><option>欠席</option></select>
+    </div>
+    <div class="wt-form-row">
+      <input id="ge-table" type="number" placeholder="卓番号">
+      <input id="ge-gift" type="number" placeholder="ご祝儀予想(円)">
+    </div>
+    <div class="wt-form-row">
+      <input id="ge-notes" placeholder="アレルギー・備考">
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button id="ge-save" style="flex:1;">保存</button>
+      <button id="ge-cancel" class="ghost" style="flex:1;">キャンセル</button>
+    </div>
+  </div>
+</div>
   <div class="wt-popup">
     <h3 id="day-modal-title">予定</h3>
     <div id="day-modal-list"></div>
@@ -384,8 +407,7 @@ function initFirebaseSync(){
       }
       if(val){
         state = Object.assign({ guests:[], tasks:[], budget:[], events:[], meta:{ giftAverage:30000, weddingDate:'2026-11-14' } }, val);
-        if(!state.meta) state.meta = { giftAverage:30000, weddingDate:'2026-11-14' };
-        if(!state.meta.weddingDate) state.meta.weddingDate = '2026-11-14';
+        state.meta = Object.assign({ giftAverage:30000, weddingDate:'2026-11-14' }, val.meta || {});
         if(!state.events) state.events = [];
       } else if(firstLoad){
         seedIfEmpty();
@@ -696,7 +718,7 @@ function renderGuests(){
       <td>${g.table||'-'}</td>
       <td>${g.gift ? yen(g.gift) : '-'}</td>
       <td>${escapeHtml(g.notes)}</td>
-      <td><button class="danger" data-del-guest="${g.id}">削除</button></td>
+      <td><button class="ghost" data-edit-guest="${g.id}" style="padding:4px 8px;font-size:12px;margin-right:4px;">編集</button><button class="danger" data-del-guest="${g.id}">削除</button></td>
     </tr>
   `).join('');
 }
@@ -727,11 +749,48 @@ document.getElementById('g-filter').addEventListener('click', (e) => {
 });
 
 document.getElementById('g-body').addEventListener('click', (e) => {
+  const editId = e.target.getAttribute('data-edit-guest');
+  if(editId){ openGuestEditModal(editId); return; }
   const id = e.target.getAttribute('data-del-guest');
   if(id){
     state.guests = state.guests.filter(g=>g.id!==id);
     renderGuests(); renderDashboard(); saveState();
   }
+});
+
+let editingGuestId = null;
+function openGuestEditModal(id){
+  const g = state.guests.find(x=>x.id===id);
+  if(!g) return;
+  editingGuestId = id;
+  document.getElementById('ge-name').value = g.name || '';
+  document.getElementById('ge-group').value = g.group || '親族';
+  document.getElementById('ge-side').value = g.side || '新郎側';
+  document.getElementById('ge-rsvp').value = g.rsvp || '未定';
+  document.getElementById('ge-table').value = g.table || '';
+  document.getElementById('ge-gift').value = g.gift || '';
+  document.getElementById('ge-notes').value = g.notes || '';
+  document.getElementById('wt-guest-edit-overlay').style.display = 'flex';
+}
+
+document.getElementById('ge-save').addEventListener('click', () => {
+  const g = state.guests.find(x=>x.id===editingGuestId);
+  if(!g) return;
+  const name = document.getElementById('ge-name').value.trim();
+  if(!name){ return; }
+  g.name = name;
+  g.group = document.getElementById('ge-group').value;
+  g.side = document.getElementById('ge-side').value;
+  g.rsvp = document.getElementById('ge-rsvp').value;
+  g.table = document.getElementById('ge-table').value;
+  g.gift = document.getElementById('ge-gift').value || state.meta.giftAverage;
+  g.notes = document.getElementById('ge-notes').value.trim();
+  document.getElementById('wt-guest-edit-overlay').style.display = 'none';
+  renderGuests(); renderDashboard(); saveState();
+});
+
+document.getElementById('ge-cancel').addEventListener('click', () => {
+  document.getElementById('wt-guest-edit-overlay').style.display = 'none';
 });
 
 // ---------- Schedule ----------
