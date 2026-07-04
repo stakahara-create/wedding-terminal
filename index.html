@@ -273,24 +273,18 @@ button.danger:hover{background:var(--plum-bg);}
       <div class="wt-panel">
         <h3>費目を追加</h3>
         <div class="wt-form-row">
-          <input id="b-cat" placeholder="費目(例: 料理・会場費)" style="flex:1.4;">
+          <input id="b-cat" placeholder="費目(例: 料理・引き出物)" style="flex:1.4;">
           <input id="b-price" type="number" placeholder="単価(円)">
-          <select id="b-countmode">
-            <option value="manual">人数: 手動指定</option>
-            <option value="all">人数: 全ゲスト(出席+未定)</option>
-            <option value="exFamily">人数: ゲスト-親族</option>
-          </select>
-          <input id="b-manualcount" type="number" placeholder="人数" value="1" style="max-width:80px;">
+          <input id="b-count" type="number" placeholder="人数・個数" value="1" style="max-width:100px;">
           <input id="b-note" placeholder="メモ">
           <button id="b-add">追加</button>
         </div>
-        <p class="wt-small">例: 料理・ケーキ・フリードリンクは「全ゲスト」、引き出物・引き菓子・エコバッグは「ゲスト-親族」、会場費など固定費は「手動指定(人数1)」がおすすめです。</p>
       </div>
       <div class="wt-panel">
         <h3>費目一覧</h3>
         <div class="wt-table-scroll">
         <table class="wt-table">
-          <thead><tr><th>費目</th><th>単価</th><th>人数</th><th>予算額</th><th>実費</th><th>差額</th><th>メモ</th><th></th></tr></thead>
+          <thead><tr><th>費目</th><th>単価</th><th>人数・個数</th><th>予算額</th><th>メモ</th><th></th></tr></thead>
           <tbody id="b-body"></tbody>
         </table>
         </div>
@@ -389,22 +383,8 @@ function seedIfEmpty(){
     state.tasks = seed.map(([phase,title]) => ({ id: uid(), phase, title, done:false, due:'' }));
   }
   if(state.budget.length === 0){
-    const items = [
-      ['会場費','manual',1],
-      ['衣装','manual',1],
-      ['写真・映像','manual',1],
-      ['料理','all',1],
-      ['ウェディングケーキ','all',1],
-      ['フリードリンク','all',1],
-      ['引き出物','exFamily',1],
-      ['引き菓子','exFamily',1],
-      ['エコバッグ','exFamily',1],
-      ['装花','manual',1],
-      ['お車代・お礼','manual',1]
-    ];
-    state.budget = items.map(([category,countMode,manualCount]) => ({
-      id: uid(), category, unitPrice:0, countMode, manualCount, actual:0, note:''
-    }));
+    const cats = ['会場費','衣装','写真・映像','料理','ウェディングケーキ','フリードリンク','引き出物','引き菓子','エコバッグ','装花','お車代・お礼'];
+    state.budget = cats.map(c => ({ id: uid(), category:c, unitPrice:0, count:1, note:'' }));
   }
 }
 
@@ -470,53 +450,32 @@ function renderAll(){
 // ---------- Dashboard ----------
 function computeBudgetSummary(){
   const budgetTotal = state.budget.reduce((s,b)=>s+budgetItemTotal(b),0);
-  const actualTotal = state.budget.reduce((s,b)=>s+(Number(b.actual)||0),0);
   const giftConfirmed = state.guests.filter(g=>g.rsvp==='出席').reduce((s,g)=>s+(Number(g.gift)||0),0);
   const giftProjected = state.guests.filter(g=>g.rsvp==='出席'||g.rsvp==='未定').reduce((s,g)=>s+(Number(g.gift)||0),0);
-  const net = actualTotal - giftConfirmed;
-  const netProjected = actualTotal - giftProjected;
-  return { budgetTotal, actualTotal, giftConfirmed, giftProjected, net, netProjected };
-}
-
-function getGuestCounts(){
-  const notDeclined = state.guests.filter(g => g.rsvp !== '欠席');
-  const all = notDeclined.length;
-  const family = notDeclined.filter(g => g.group === '親族').length;
-  return { all, exFamily: all - family };
-}
-
-function budgetItemCount(b){
-  const counts = getGuestCounts();
-  if(b.countMode === 'all') return counts.all;
-  if(b.countMode === 'exFamily') return counts.exFamily;
-  return Number(b.manualCount) || 0;
+  const net = budgetTotal - giftConfirmed;
+  const netProjected = budgetTotal - giftProjected;
+  return { budgetTotal, giftConfirmed, giftProjected, net, netProjected };
 }
 
 function budgetItemTotal(b){
-  return (Number(b.unitPrice) || 0) * budgetItemCount(b);
+  return (Number(b.unitPrice) || 0) * (Number(b.count) || 0);
 }
 
 function normalizeBudgetItem(b){
-  const hasNewSchema = b.unitPrice !== undefined || b.countMode !== undefined;
-  if(hasNewSchema){
-    return {
-      id: b.id, category: b.category || '',
-      unitPrice: Number(b.unitPrice) || 0,
-      countMode: b.countMode || 'manual',
-      manualCount: b.manualCount !== undefined ? Number(b.manualCount) : 1,
-      actual: Number(b.actual) || 0,
-      note: b.note || ''
-    };
+  if(b.count !== undefined && b.unitPrice !== undefined){
+    return { id: b.id, category: b.category || '', unitPrice: Number(b.unitPrice)||0, count: Number(b.count)||0, note: b.note || '' };
   }
-  // 旧データ(単価×人数を導入する前の予算額のみのデータ)を手動人数1件として移行
-  return {
-    id: b.id, category: b.category || '',
-    unitPrice: Number(b.budgeted) || 0,
-    countMode: 'manual',
-    manualCount: 1,
-    actual: Number(b.actual) || 0,
-    note: b.note || ''
-  };
+  if(b.unitPrice !== undefined || b.countMode !== undefined){
+    // 旧: 単価×人数区分(自動計算)方式からの移行。現在時点の計算結果をそのまま手動人数として引き継ぐ
+    const notDeclined = state.guests.filter(g => g.rsvp !== '欠席');
+    const family = notDeclined.filter(g => g.group === '親族').length;
+    let count = b.manualCount !== undefined ? Number(b.manualCount) : 1;
+    if(b.countMode === 'all') count = notDeclined.length;
+    if(b.countMode === 'exFamily') count = notDeclined.length - family;
+    return { id: b.id, category: b.category || '', unitPrice: Number(b.unitPrice)||0, count, note: b.note || '' };
+  }
+  // 旧: 予算額のみのデータ
+  return { id: b.id, category: b.category || '', unitPrice: Number(b.budgeted)||0, count: 1, note: b.note || '' };
 }
 
 function renderDashboard(){
@@ -934,12 +893,10 @@ document.getElementById('phase-list').addEventListener('click', (e) => {
 
 // ---------- Budget ----------
 function renderBudget(){
-  const { budgetTotal, actualTotal, giftConfirmed, giftProjected, net, netProjected } = computeBudgetSummary();
+  const { budgetTotal, giftConfirmed, giftProjected, net, netProjected } = computeBudgetSummary();
 
   document.getElementById('net-panel').innerHTML = `
     <div class="item"><div class="l">総予算</div><div class="v">${yen(budgetTotal)}</div></div>
-    <div class="sep"></div>
-    <div class="item"><div class="l">実支出計</div><div class="v">${yen(actualTotal)}</div></div>
     <div class="sep"></div>
     <div class="item"><div class="l">ご祝儀見込み(未定含む)</div><div class="v">${yen(giftProjected)}</div></div>
     <div class="sep"></div>
@@ -950,30 +907,15 @@ function renderBudget(){
     <div class="item"><div class="l">実質負担(確定ベース)</div><div class="v">${yen(net)}</div></div>
   `;
 
-  const counts = getGuestCounts();
   document.getElementById('b-body').innerHTML = state.budget.map(b => {
-    const count = budgetItemCount(b);
     const total = budgetItemTotal(b);
-    const diff = total - (Number(b.actual)||0);
-    const countCell = b.countMode === 'manual'
-      ? `<input type="number" value="${b.manualCount}" data-field="manualCount" data-id="${b.id}" style="width:60px;">`
-      : `<span class="wt-small">${count}人</span>`;
     return `
     <tr data-id="${b.id}">
-      <td><input type="text" value="${escapeHtml(b.category)}" data-field="category" data-id="${b.id}" style="width:120px;"></td>
+      <td><input type="text" value="${escapeHtml(b.category)}" data-field="category" data-id="${b.id}" style="width:130px;"></td>
       <td><input type="number" value="${b.unitPrice}" data-field="unitPrice" data-id="${b.id}" style="width:90px;"></td>
-      <td>
-        <select data-field="countMode" data-id="${b.id}">
-          <option value="manual" ${b.countMode==='manual'?'selected':''}>手動</option>
-          <option value="all" ${b.countMode==='all'?'selected':''}>全ゲスト(${counts.all})</option>
-          <option value="exFamily" ${b.countMode==='exFamily'?'selected':''}>ゲスト-親族(${counts.exFamily})</option>
-        </select>
-        ${countCell}
-      </td>
+      <td><input type="number" value="${b.count}" data-field="count" data-id="${b.id}" style="width:80px;"></td>
       <td><b>${yen(total)}</b></td>
-      <td><input type="number" value="${b.actual}" data-field="actual" data-id="${b.id}" style="width:100px;"></td>
-      <td style="color:${diff<0?'var(--plum)':'var(--sage)'}">${yen(diff)}</td>
-      <td><input type="text" value="${escapeHtml(b.note)}" data-field="note" data-id="${b.id}" style="width:110px;"></td>
+      <td><input type="text" value="${escapeHtml(b.note)}" data-field="note" data-id="${b.id}" style="width:130px;"></td>
       <td><button class="danger" data-del-budget="${b.id}">削除</button></td>
     </tr>
   `;}).join('');
@@ -986,14 +928,11 @@ document.getElementById('b-add').addEventListener('click', () => {
     id: uid(),
     category: cat,
     unitPrice: document.getElementById('b-price').value || 0,
-    countMode: document.getElementById('b-countmode').value,
-    manualCount: document.getElementById('b-manualcount').value || 1,
-    actual: 0,
+    count: document.getElementById('b-count').value || 1,
     note: document.getElementById('b-note').value.trim()
   });
   ['b-cat','b-price','b-note'].forEach(id => document.getElementById(id).value='');
-  document.getElementById('b-countmode').value = 'manual';
-  document.getElementById('b-manualcount').value = 1;
+  document.getElementById('b-count').value = 1;
   renderBudget(); renderDashboard(); saveState();
 });
 
@@ -1013,8 +952,6 @@ document.getElementById('b-body').addEventListener('change', (e) => {
   if(!b){ return; }
   if(field === 'category' || field === 'note'){
     b[field] = e.target.value.trim();
-  }else if(field === 'countMode'){
-    b.countMode = e.target.value;
   }else{
     b[field] = Number(e.target.value) || 0;
   }
